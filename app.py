@@ -8,7 +8,7 @@ def submit(text,temperature,frequency_penalty):
         raise gr.Error("Please enter some text to generate")
     data = {
         "model": "HuggingFaceH4/zephyr-7b-beta",
-        "prompt": text,
+        "prompt": f"<|user|>\n{text}</s>\n<|assissant|>",
         "temperature": temperature,
         "max_tokens": frequency_penalty
     }

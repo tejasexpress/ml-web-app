@@ -22,6 +22,14 @@ async def submit(input: Input):
     response = requests.post("https://03fa-198-166-142-218.ngrok-free.app/v1/completions", headers=header, json=payload)
     if response.status_code == 200:
         output=response.json()
-        return output['choices'][0]['text']
+        output_text = output["choices"][0]["text"]
+        index = output_text.find("<|user|>")
+        if index != -1:
+            output_text = output_text[:index]
+        index = output_text.find("<|assissant|>")
+        if index != -1:
+            output_text = output_text[index+13:]
+        output_text = output_text.replace("\n","")
+        return output_text
     return "Error: Unable to fetch response from server"
 
