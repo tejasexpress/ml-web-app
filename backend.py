@@ -1,35 +1,41 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+from typing import List
+from enum import Enum
 import requests
+import os
+import openai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = FastAPI()
 
+class ChatMessageRole(str, Enum):
+    System = "system"
+    User = "user"
+    Assistant = "assistant"
+
+class ChatCompletionMessage(BaseModel):
+    role: ChatMessageRole
+    content: str
+    class Config:
+        use_enum_values = True
+
 class Input(BaseModel):
-    model: str
-    prompt: str
+    messages: List[ChatCompletionMessage]
     temperature: float
-    max_tokens: int
+    frequency_penalty: float
 
 @app.post("/v1/submit")
 async def submit(input: Input):
-    header = {"Content-Type": "application/json"}
-    payload = {
-        "model": input.model,
-        "prompt": input.prompt,
-        "temperature": input.temperature,
-        "max_tokens": input.max_tokens
-    }
-    response = requests.post("https://03fa-198-166-142-218.ngrok-free.app/v1/completions", headers=header, json=payload)
-    if response.status_code == 200:
-        output=response.json()
-        output_text = output["choices"][0]["text"]
-        index = output_text.find("<|user|>")
-        if index != -1:
-            output_text = output_text[:index]
-        index = output_text.find("<|assissant|>")
-        if index != -1:
-            output_text = output_text[index+13:]
-        output_text = output_text.replace("\n","")
-        return output_text
-    return "Error: Unable to fetch response from server"
-
+    messages_dicts = [message.dict() for message in input.messages]
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages = messages_dicts,
+        temperature=input.temperature,
+        frequency_penalty=input.frequency_penalty
+    )
+    return completion['choices'][0]['message']['content']
