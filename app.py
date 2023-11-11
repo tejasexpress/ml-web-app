@@ -35,11 +35,29 @@ def submit(query, Chatbot,temperature,frequency_penalty):
         "temperature": temperature,
         "frequency_penalty": frequency_penalty
     }
-    response = requests.post("http://127.0.0.1:8000/v1/submit", json=data)
-    if response.status_code == 200:  
-        Chatbot.append((query, response.text)) 
-        return '',Chatbot
-    raise gr.Error("Unable to fetch response from server")
+    response = requests.post("http://127.0.0.1:8000/v1/submit", json=data, stream=True)
+    Chatbot = Chatbot + [[query,""]]
+    if response.status_code == 200:
+        acc_text = ""
+        try:
+            for i, chunk in enumerate(response.iter_content(chunk_size=1024)):
+                if chunk:
+                    text = str(chunk, encoding="utf-8")
+                acc_text += text
+                last_turn = list(Chatbot.pop(-1))
+                last_turn[-1] += acc_text
+                Chatbot = Chatbot + [last_turn]
+                yield "", Chatbot
+                acc_text = ""
+        except requests.exceptions.RequestException as e:
+            # Handle any exceptions that may occur during the streaming
+            print("Error occurred during streaming:", str(e))
+
+        # stripped_text = response.text.strip('"')
+        # newline = stripped_text.replace('\\n', '\n')
+        # print(newline)
+        # Chatbot.append((query, newline)) 
+        # return '',Chatbot
     
 with gr.Blocks( theme=gr.themes.Soft(primary_hue="violet"), css="""#component-0 {margin : 7vw 17vw;}
                                                                    #title h1{text-align:center;
@@ -57,5 +75,4 @@ with gr.Blocks( theme=gr.themes.Soft(primary_hue="violet"), css="""#component-0 
     Input.submit(submit, inputs=[Input, Chatbot, temperature, frequency_penalty], outputs=[Input, Chatbot])
 
 if __name__ == "__main__":
-    demo.queue()
-    demo.launch(show_api=False) 
+    demo.queue().launch(show_api=False) 
